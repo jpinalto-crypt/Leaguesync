@@ -62,7 +62,8 @@ export async function POST(
       return NextResponse.json({ error: "League not active" }, { status: 402 });
     }
 
-    const rawText = await req.text();
+    const rawText = await req.text();console.log("Raw body length:", rawText.length);
+console.log("Raw preview:", rawText.slice(0, 200));
     let body: any = {};
     try {
       body = rawText ? JSON.parse(rawText) : {};
