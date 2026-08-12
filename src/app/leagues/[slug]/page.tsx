@@ -29,6 +29,7 @@ export default async function LeaguePage({
           players: true,
           games: true,
           weeklyExports: true,
+          members: true,
         },
       },
     },
@@ -39,6 +40,21 @@ export default async function LeaguePage({
   const isOwner = session?.user?.id === league.ownerId;
   const isActive = league.status === "ACTIVE" || league.isFree;
   const exportUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/import/${league.exportToken}`;
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/join/${league.inviteCode || league.slug}`;
+
+  // Check if current user is already a member
+  let membership = null;
+  if (session?.user?.id) {
+    membership = await prisma.leagueMember.findUnique({
+      where: {
+        leagueId_userId: {
+          leagueId: league.id,
+          userId: session.user.id,
+        },
+      },
+      include: { team: true },
+    });
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -83,13 +99,18 @@ export default async function LeaguePage({
           </div>
           <p className="text-zinc-400 text-sm">
             {league._count.players.toLocaleString()} players · {league.teams.length} teams ·{" "}
-            {league._count.weeklyExports} exports
+            {league._count.members} members · {league._count.weeklyExports} exports
           </p>
+          {membership?.team && (
+            <p className="text-emerald-400 text-sm mt-2">
+              Your team: <span className="font-medium">{membership.team.name}</span>
+            </p>
+          )}
         </div>
 
-        {/* Export URL Card */}
-        {isActive && (
-          <div className="bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-6 mb-10">
+        {/* Export URL Card (owner only when active) */}
+        {isActive && isOwner && (
+          <div className="bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold text-emerald-300 mb-1">Export URL</h2>
             <p className="text-zinc-400 text-sm mb-4">
               Paste this into the Madden Companion App to sync your league.
@@ -100,13 +121,43 @@ export default async function LeaguePage({
           </div>
         )}
 
+        {/* Invite Members (owner only) */}
+        {isOwner && isActive && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
+            <h2 className="font-semibold mb-1">Invite Members</h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Share this link so others can sign in with Discord, join the league, and claim a team.
+            </p>
+            <code className="block bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm break-all text-sky-300 select-all font-mono">
+              {inviteUrl}
+            </code>
+          </div>
+        )}
+
+        {/* Activate (owner, not active) */}
         {!isActive && isOwner && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 mb-10">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold text-amber-300 mb-2">Activate League — $10</h2>
             <p className="text-zinc-400 text-sm mb-4">
               One-time payment to unlock the export URL and full features.
             </p>
             <ActivateButton leagueId={league.id} />
+          </div>
+        )}
+
+        {/* Claim Team (member who hasn't claimed yet) */}
+        {membership && !membership.teamId && isActive && (
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-2xl p-6 mb-6">
+            <h2 className="font-semibold text-sky-300 mb-2">Claim Your Team</h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Connect your Discord account to the team you control in this league.
+            </p>
+            <Link
+              href={`/leagues/${slug}/claim`}
+              className="inline-block bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+            >
+              Choose Team →
+            </Link>
           </div>
         )}
 
@@ -117,6 +168,12 @@ export default async function LeaguePage({
             className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
           >
             All Players →
+          </Link>
+          <Link
+            href={`/leagues/${slug}/schedule`}
+            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+          >
+            Schedule →
           </Link>
         </div>
 
@@ -144,7 +201,7 @@ export default async function LeaguePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {league.teams.map((team, i) => (
+                  {league.teams.map((team) => (
                     <tr
                       key={team.id}
                       className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition"
