@@ -63,6 +63,9 @@ export async function POST(
     }
 
     const rawText = await req.text();
+    console.log("Raw body length:", rawText.length);
+    console.log("Raw preview:", rawText.slice(0, 200));
+
     let body: any = {};
     try {
       body = rawText ? JSON.parse(rawText) : {};
@@ -216,22 +219,36 @@ export async function POST(
 
     // ========== SCHEDULES ==========
     if (body.gameScheduleInfoList && Array.isArray(body.gameScheduleInfoList)) {
-      console.log("Parsing schedules...", body.gameScheduleInfoList.length);
+      console.log("Parsing schedules...", body.gameScheduleInfoList.length, "games");
+
+      const teams = await prisma.team.findMany({
+        where: { leagueId: league.id },
+      });
+
+      const teamByAppId = new Map(
+        teams.map((t) => [String(t.abbreviation), t])
+      );
+
+      let created = 0;
+      let updated = 0;
+      let skipped = 0;
 
       for (const g of body.gameScheduleInfoList) {
         try {
           const week = g.weekIndex ?? g.week ?? 0;
-          const homeName = g.homeTeamName || g.homeTeam || "Home";
-          const awayName = g.awayTeamName || g.awayTeam || "Away";
+          const homeAppId = String(g.homeTeamId ?? "");
+          const awayAppId = String(g.awayTeamId ?? "");
 
-          const homeTeam = await prisma.team.findFirst({
-            where: { leagueId: league.id, name: homeName },
-          });
-          const awayTeam = await prisma.team.findFirst({
-            where: { leagueId: league.id, name: awayName },
-          });
+          const homeTeam = teamByAppId.get(homeAppId);
+          const awayTeam = teamByAppId.get(awayAppId);
 
-          if (!homeTeam || !awayTeam) continue;
+          if (!homeTeam || !awayTeam) {
+            skipped++;
+            continue;
+          }
+
+          const isComplete =
+            g.status === 3 || g.status === "Complete" || g.isComplete === true;
 
           const existing = await prisma.game.findFirst({
             where: {
@@ -248,27 +265,35 @@ export async function POST(
               data: {
                 homeScore: g.homeScore ?? existing.homeScore,
                 awayScore: g.awayScore ?? existing.awayScore,
-                isComplete: g.status === "Complete" || g.isComplete || false,
+                isComplete,
+                seasonType: g.stageIndex === 0 ? "Preseason" : "Regular",
               },
             });
+            updated++;
           } else {
             await prisma.game.create({
               data: {
                 leagueId: league.id,
                 week,
-                seasonType: g.seasonType || "Regular",
+                seasonType: g.stageIndex === 0 ? "Preseason" : "Regular",
                 homeTeamId: homeTeam.id,
                 awayTeamId: awayTeam.id,
                 homeScore: g.homeScore ?? null,
                 awayScore: g.awayScore ?? null,
-                isComplete: g.status === "Complete" || false,
+                isComplete,
               },
             });
+            created++;
           }
         } catch (err: any) {
           console.error("Schedule parse error:", err.message);
+          skipped++;
         }
       }
+
+      console.log(
+        `Schedules done → Created: ${created}, Updated: ${updated}, Skipped: ${skipped}`
+      );
     }
 
     return NextResponse.json({ success: true });
