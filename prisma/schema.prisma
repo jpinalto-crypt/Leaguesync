@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// For production switch to:
+// provider = "postgresql"
+// url      = env("DATABASE_URL")
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum LeagueStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  discordId     String?   @unique
+  role          Role      @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  ownedLeagues  League[]  @relation("LeagueOwner")
+  memberships   LeagueMember[]
+  tradesCreated Trade[]   @relation("TradeCreator")
+  tradeVotes    TradeVote[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model League {
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  description     String?
+  status          LeagueStatus @default(PENDING_PAYMENT)
+  isFree          Boolean      @default(false) // Admin-created free leagues
+  exportToken     String       @unique @default(cuid()) // Unique token for Madden Companion App export URL
+  discordGuildId  String?
+  discordInvite   String?
+  season          String?      // e.g. "2026"
+  currentWeek     Int?
+  ownerId         String
+  stripeSessionId String?
+  paidAt          DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  owner           User         @relation("LeagueOwner", fields: [ownerId], references: [id])
+  members         LeagueMember[]
+  teams           Team[]
+  players         Player[]
+  games           Game[]
+  trades          Trade[]
+  weeklyExports   WeeklyExport[]
+}
+
+model LeagueMember {
+  id        String   @id @default(cuid())
+  leagueId  String
+  userId    String
+  teamId    String?  // Which team they control
+  role      String   @default("OWNER") // OWNER, COMMISSIONER, MEMBER
+  joinedAt  DateTime @default(now())
+
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team?    @relation(fields: [teamId], references: [id])
+
+  @@unique([leagueId, userId])
+}
+
+model Team {
+  id            String   @id @default(cuid())
+  leagueId      String
+  name          String
+  abbreviation  String?  // e.g. DAL, KC
+  city          String?
+  division      String?
+  conference    String?
+  overall       Int?
+  recordWins    Int      @default(0)
+  recordLosses  Int      @default(0)
+  recordTies    Int      @default(0)
+  capAvailable  Int?     // in dollars or simplified
+  offenseScheme String?
+  defenseScheme String?
+  offDevs       Int?
+  defDevs       Int?
+  injuries      Int      @default(0)
+  isCpu         Boolean  @default(false)
+  primaryColor  String?
+  secondaryColor String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  players       Player[]
+  members       LeagueMember[]
+  homeGames     Game[]   @relation("HomeTeam")
+  awayGames     Game[]   @relation("AwayTeam")
+  tradesAsTeamA Trade[]  @relation("TradeTeamA")
+  tradesAsTeamB Trade[]  @relation("TradeTeamB")
+}
+
+model Player {
+  id            String   @id @default(cuid())
+  leagueId      String
+  teamId        String?
+  firstName     String
+  lastName      String
+  position      String
+  jerseyNumber  Int?
+  overall       Int?
+  age           Int?
+  height        String?
+  weight        Int?
+  speed         Int?
+  strength      Int?
+  agility       Int?
+  acceleration  Int?
+  awareness     Int?
+  development   String?  // Normal, Star, Superstar, X-Factor
+  tradeValue    Int?
+  contractYears Int?
+  salary        Int?
+  isOnTradeBlock Boolean @default(false)
+  injuryStatus  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team          Team?    @relation(fields: [teamId], references: [id])
+
+  @@index([leagueId, position])
+  @@index([leagueId, lastName])
+}
+
+model Game {
+  id            String   @id @default(cuid())
+  leagueId      String
+  week          Int
+  seasonType    String   @default("Regular") // Preseason, Regular, Playoffs
+  homeTeamId    String
+  awayTeamId    String
+  homeScore     Int?
+  awayScore     Int?
+  isComplete    Boolean  @default(false)
+  playedAt      DateTime?
+  createdAt     DateTime @default(now())
+
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeam      Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam      Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  @@index([leagueId, week])
+}
+
+model Trade {
+  id            String   @id @default(cuid())
+  leagueId      String
+  createdById   String
+  teamAId       String
+  teamBId       String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  notes         String?
+  teamAPlayers  String?  // JSON array of player IDs for simplicity
+  teamBPlayers  String?
+  teamAPicks    String?
+  teamBPicks    String?
+  createdAt     DateTime @default(now())
+  resolvedAt    DateTime?
+
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  createdBy     User     @relation("TradeCreator", fields: [createdById], references: [id])
+  teamA         Team     @relation("TradeTeamA", fields: [teamAId], references: [id])
+  teamB         Team     @relation("TradeTeamB", fields: [teamBId], references: [id])
+  votes         TradeVote[]
+}
+
+model TradeVote {
+  id        String   @id @default(cuid())
+  tradeId   String
+  userId    String
+  vote      String   // APPROVE, REJECT
+  createdAt DateTime @default(now())
+
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeId, userId])
+}
+
+model WeeklyExport {
+  id        String   @id @default(cuid())
+  leagueId  String
+  week      Int
+  type      String   // LEAGUE_INFO, ROSTERS, WEEKLY_STATS
+  rawData   String?  // Store JSON if needed for debugging
+  receivedAt DateTime @default(now())
+
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, week, type])
+}
