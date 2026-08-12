@@ -38,11 +38,11 @@ export default async function LeaguePage({
   if (!league) notFound();
 
   const isOwner = session?.user?.id === league.ownerId;
+  const isAdmin = session?.user?.role === "ADMIN";
   const isActive = league.status === "ACTIVE" || league.isFree;
   const exportUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/import/${league.exportToken}`;
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/join/${league.inviteCode || league.slug}`;
 
-  // Check if current user is already a member
   let membership = null;
   if (session?.user?.id) {
     membership = await prisma.leagueMember.findUnique({
@@ -58,14 +58,13 @@ export default async function LeaguePage({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Top Navigation */}
       <header className="border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/dashboard" className="font-semibold tracking-tight">
             <span className="text-emerald-400">Madden</span> League HQ
           </Link>
           <div className="flex items-center gap-5 text-sm">
-            {session?.user?.role === "ADMIN" && (
+            {isAdmin && (
               <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition">
                 Admin
               </Link>
@@ -83,7 +82,7 @@ export default async function LeaguePage({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
-        {/* League Header */}
+        {/* Header */}
         <div className="mb-10">
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{league.name}</h1>
@@ -99,7 +98,8 @@ export default async function LeaguePage({
           </div>
           <p className="text-zinc-400 text-sm">
             {league._count.players.toLocaleString()} players · {league.teams.length} teams ·{" "}
-            {league._count.members} members · {league._count.weeklyExports} exports
+            {league._count.members} members · {league._count.games} games ·{" "}
+            {league._count.weeklyExports} exports
           </p>
           {membership?.team && (
             <p className="text-emerald-400 text-sm mt-2">
@@ -108,7 +108,7 @@ export default async function LeaguePage({
           )}
         </div>
 
-        {/* Export URL Card (owner only when active) */}
+        {/* Export URL */}
         {isActive && isOwner && (
           <div className="bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold text-emerald-300 mb-1">Export URL</h2>
@@ -121,12 +121,12 @@ export default async function LeaguePage({
           </div>
         )}
 
-        {/* Invite Members (owner only) */}
+        {/* Invite */}
         {isOwner && isActive && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold mb-1">Invite Members</h2>
             <p className="text-zinc-400 text-sm mb-4">
-              Share this link so others can sign in with Discord, join the league, and claim a team.
+              Share this link so others can sign in with Discord, join, and claim a team.
             </p>
             <code className="block bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-3 text-sm break-all text-sky-300 select-all font-mono">
               {inviteUrl}
@@ -134,7 +134,7 @@ export default async function LeaguePage({
           </div>
         )}
 
-        {/* Activate (owner, not active) */}
+        {/* Activate */}
         {!isActive && isOwner && (
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold text-amber-300 mb-2">Activate League — $10</h2>
@@ -145,12 +145,12 @@ export default async function LeaguePage({
           </div>
         )}
 
-        {/* Claim Team (member who hasn't claimed yet) */}
+        {/* Claim team */}
         {membership && !membership.teamId && isActive && (
           <div className="bg-sky-500/10 border border-sky-500/20 rounded-2xl p-6 mb-6">
             <h2 className="font-semibold text-sky-300 mb-2">Claim Your Team</h2>
             <p className="text-zinc-400 text-sm mb-4">
-              Connect your Discord account to the team you control in this league.
+              Connect your Discord account to the team you control.
             </p>
             <Link
               href={`/leagues/${slug}/claim`}
@@ -175,6 +175,22 @@ export default async function LeaguePage({
           >
             Schedule →
           </Link>
+          {(isOwner || isAdmin) && (
+            <Link
+              href={`/leagues/${slug}/import-schedule`}
+              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+            >
+              Import Schedule →
+            </Link>
+          )}
+          {membership && !membership.teamId && isActive && (
+            <Link
+              href={`/leagues/${slug}/claim`}
+              className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+            >
+              Claim Team →
+            </Link>
+          )}
         </div>
 
         {/* Standings */}
@@ -232,7 +248,7 @@ export default async function LeaguePage({
           )}
         </section>
 
-        {/* Top Players Preview */}
+        {/* Top Players */}
         <section>
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-xl font-semibold">Top Players</h2>
