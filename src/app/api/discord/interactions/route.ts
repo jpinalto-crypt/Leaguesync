@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const commandName = interaction.data.name;
     const options = interaction.data.options || [];
 
-    // /standings
+    // ========== /standings ==========
     if (commandName === "standings") {
       const leagueSlug = options.find((o: any) => o.name === "league")?.value;
 
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // /player
+    // ========== /player ==========
     if (commandName === "player") {
       const name = options.find((o: any) => o.name === "name")?.value;
       const leagueSlug = options.find((o: any) => o.name === "league")?.value;
@@ -142,6 +142,128 @@ export async function POST(req: NextRequest) {
                 { name: "Acceleration", value: String(player.acceleration ?? "—"), inline: true },
                 { name: "Awareness", value: String(player.awareness ?? "—"), inline: true },
               ],
+            },
+          ],
+        },
+      });
+    }
+
+    // ========== /team ==========
+    if (commandName === "team") {
+      const teamName = options.find((o: any) => o.name === "name")?.value;
+      const leagueSlug = options.find((o: any) => o.name === "league")?.value;
+
+      if (!teamName || !leagueSlug) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: "Usage: `/team name:Chiefs league:tyest-league`" },
+        });
+      }
+
+      const league = await prisma.league.findUnique({
+        where: { slug: leagueSlug },
+      });
+
+      if (!league) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: "League not found." },
+        });
+      }
+
+      const team = await prisma.team.findFirst({
+        where: {
+          leagueId: league.id,
+          name: { contains: teamName, mode: "insensitive" },
+        },
+      });
+
+      if (!team) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: `No team found matching "${teamName}".` },
+        });
+      }
+
+      const topPlayers = await prisma.player.findMany({
+        where: { leagueId: league.id },
+        orderBy: { overall: "desc" },
+        take: 5,
+      });
+
+      const playerLines = topPlayers.map(
+        (p) => `• ${p.firstName} ${p.lastName} (${p.position}) — ${p.overall ?? "—"} OVR`
+      );
+
+      return NextResponse.json({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          embeds: [
+            {
+              title: team.name,
+              description: `Record: **${team.recordWins}-${team.recordLosses}${
+                team.recordTies ? `-${team.recordTies}` : ""
+              }** · OVR **${team.overall ?? "—"}**\n${team.division || ""} ${team.conference || ""}`,
+              color: 0x10b981,
+              fields: [
+                {
+                  name: "Top Players (league)",
+                  value: playerLines.join("\n") || "No players",
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }
+
+    // ========== /top ==========
+    if (commandName === "top") {
+      const leagueSlug = options.find((o: any) => o.name === "league")?.value;
+      const position = options.find((o: any) => o.name === "position")?.value;
+
+      if (!leagueSlug) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: "Usage: `/top league:tyest-league position:WR`" },
+        });
+      }
+
+      const league = await prisma.league.findUnique({
+        where: { slug: leagueSlug },
+      });
+
+      if (!league) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: "League not found." },
+        });
+      }
+
+      const where: any = { leagueId: league.id };
+      if (position) where.position = position;
+
+      const players = await prisma.player.findMany({
+        where,
+        orderBy: { overall: "desc" },
+        take: 10,
+      });
+
+      const lines = players.map(
+        (p, i) =>
+          `**${i + 1}.** ${p.firstName} ${p.lastName} (${p.position}) — **${p.overall ?? "—"}** OVR`
+      );
+
+      return NextResponse.json({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          embeds: [
+            {
+              title: position
+                ? `Top ${position}s — ${league.name}`
+                : `Top Players — ${league.name}`,
+              description: lines.join("\n") || "No players found.",
+              color: 0x10b981,
             },
           ],
         },
