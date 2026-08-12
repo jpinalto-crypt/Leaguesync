@@ -29,11 +29,9 @@ export default async function TeamPage({
   const players = await prisma.player.findMany({
     where: {
       leagueId: league.id,
-      // For now we don't have teamId linked perfectly, so we'll show all for this demo
-      // Later we can improve the import to properly link players to teams
+      teamId: team.id,
     },
-    orderBy: [{ overall: "desc" }],
-    take: 50,
+    orderBy: [{ overall: "desc" }, { lastName: "asc" }],
   });
 
   return (
@@ -47,48 +45,85 @@ export default async function TeamPage({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">{team.name}</h1>
-          <p className="text-zinc-400 mt-2">
-            Record: {formatRecord(team.recordWins, team.recordLosses, team.recordTies)} · 
-            OVR: {team.overall ?? "—"} · 
-            {team.division || ""} {team.conference || ""}
+        {/* Team Header */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 mb-8">
+          <h1 className="text-3xl font-bold mb-2">{team.name}</h1>
+          <p className="text-zinc-400">
+            Record:{" "}
+            <span className="text-white font-medium">
+              {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
+            </span>
+            {" · "}
+            OVR: <span className="text-emerald-400 font-medium">{team.overall ?? "—"}</span>
+            {team.division && (
+              <>
+                {" · "}
+                {team.division} {team.conference}
+              </>
+            )}
+          </p>
+          <p className="text-sm text-zinc-500 mt-2">
+            {players.length} players on roster
           </p>
         </div>
 
-        <h2 className="text-xl font-semibold mb-4">Roster (sample)</h2>
-        <p className="text-sm text-zinc-500 mb-4">
-          Note: Player-to-team linking is not fully complete yet from the imports. Showing top players for now.
-        </p>
+        {/* Roster */}
+        <h2 className="text-xl font-semibold mb-4">Roster</h2>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-800 text-left text-zinc-400">
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Pos</th>
-                <th className="px-4 py-3">OVR</th>
-                <th className="px-4 py-3">Age</th>
-                <th className="px-4 py-3">SPD</th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((player) => (
-                <tr key={player.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                  <td className="px-4 py-3 font-medium">
-                    {player.firstName} {player.lastName}
-                  </td>
-                  <td className="px-4 py-3">{player.position}</td>
-                  <td className="px-4 py-3 text-emerald-400 font-semibold">
-                    {player.overall ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-400">{player.age ?? "—"}</td>
-                  <td className="px-4 py-3 text-zinc-400">{player.speed ?? "—"}</td>
+        {players.length === 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center text-zinc-500">
+            No players linked to this team yet.
+            <br />
+            <span className="text-sm">
+              Re-export rosters from the Companion App after the latest update.
+            </span>
+          </div>
+        ) : (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 text-left text-zinc-400">
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Pos</th>
+                  <th className="px-4 py-3">OVR</th>
+                  <th className="px-4 py-3">Age</th>
+                  <th className="px-4 py-3">SPD</th>
+                  <th className="px-4 py-3">STR</th>
+                  <th className="px-4 py-3">AGI</th>
+                  <th className="px-4 py-3">Dev</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {players.map((player) => (
+                  <tr
+                    key={player.id}
+                    className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
+                  >
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        href={`/leagues/${slug}/players/${player.id}`}
+                        className="hover:text-emerald-400"
+                      >
+                        {player.firstName} {player.lastName}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">{player.position}</td>
+                    <td className="px-4 py-3 font-semibold text-emerald-400">
+                      {player.overall ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-400">{player.age ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-400">{player.speed ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-400">{player.strength ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-400">{player.agility ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      {player.development ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
     </div>
   );
