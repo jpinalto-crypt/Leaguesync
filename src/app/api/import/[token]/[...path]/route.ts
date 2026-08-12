@@ -32,8 +32,10 @@ export async function POST(
   const pathStr = path ? path.join("/") : "no-path";
 
   console.log("=== IMPORT HIT ===");
-  console.log("Token:", token);
   console.log("Path:", pathStr);
+  console.log("Method:", req.method);
+  console.log("Content-Type:", req.headers.get("content-type"));
+  console.log("Content-Length header:", req.headers.get("content-length"));
 
   try {
     const league = await prisma.league.findUnique({
@@ -41,45 +43,44 @@ export async function POST(
     });
 
     if (!league) {
-      console.log("League not found for token");
+      console.log("League not found");
       return NextResponse.json({ error: "Invalid export token" }, { status: 404 });
     }
 
     console.log("League found:", league.slug);
 
-    // Read raw body
-    const rawText = await req.text();
-    console.log("Raw body length:", rawText.length);
-    console.log("Raw body preview:", rawText.slice(0, 300));
-
-    let body: any = {};
+    // Try multiple ways to read the body
+    let rawText = "";
     try {
-      body = rawText ? JSON.parse(rawText) : {};
-      console.log("Parsed body keys:", Object.keys(body));
+      rawText = await req.text();
+      console.log("Method text() length:", rawText.length);
     } catch (e: any) {
-      console.log("JSON parse failed:", e.message);
-      body = {};
+      console.log("text() failed:", e.message);
     }
 
-    // Check for roster
-    if (body.rosterInfoList) {
-      console.log("FOUND rosterInfoList with", body.rosterInfoList.length, "players");
-    } else {
-      console.log("NO rosterInfoList found in body");
+    if (!rawText) {
+      try {
+        const buffer = await req.arrayBuffer();
+        rawText = new TextDecoder().decode(buffer);
+        console.log("Method arrayBuffer length:", rawText.length);
+      } catch (e: any) {
+        console.log("arrayBuffer failed:", e.message);
+      }
     }
 
-    // Check for standings
-    if (body.teamStandingInfoList) {
-      console.log("FOUND teamStandingInfoList with", body.teamStandingInfoList.length, "teams");
-    } else {
-      console.log("NO teamStandingInfoList found in body");
-    }
+    console.log("Final body length:", rawText.length);
+    console.log("Preview:", rawText.slice(0, 200));
 
-    // For now just return success so the Companion App is happy
-    return new NextResponse(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new NextResponse(
+      JSON.stringify({
+        success: true,
+        bodyLength: rawText.length,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (err: any) {
     console.error("Import error:", err);
     return NextResponse.json({ error: "Import failed" }, { status: 500 });
