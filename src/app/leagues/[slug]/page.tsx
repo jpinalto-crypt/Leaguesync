@@ -179,8 +179,13 @@ export default async function LeaguePage({
                   {league.players.map((player) => (
                     <tr key={player.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                       <td className="px-4 py-3 font-medium">
-                        {player.firstName} {player.lastName}
-                      </td>
+  <Link
+    href={`/leagues/${slug}/players/${player.id}`}
+    className="hover:text-emerald-400"
+  >
+    {player.firstName} {player.lastName}
+  </Link>
+</td>
                       <td className="px-4 py-3">{player.position}</td>
                       <td className="px-4 py-3 font-semibold text-emerald-400">
                         {player.overall ?? "—"}
