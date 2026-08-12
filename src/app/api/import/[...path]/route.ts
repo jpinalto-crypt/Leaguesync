@@ -75,15 +75,16 @@ export async function POST(
     // ========== ROSTERS ==========
     if (body.rosterInfoList && Array.isArray(body.rosterInfoList)) {
       console.log("Parsing", body.rosterInfoList.length, "players");
+      console.log("Full pathArray:", pathArray);
 
-      // Get team id from path (e.g. team/775553046/roster)
       let teamIdFromPath: string | null = null;
       const teamIndex = pathArray.findIndex((p) => p === "team");
       if (teamIndex !== -1 && pathArray[teamIndex + 1]) {
-        teamIdFromPath = pathArray[teamIndex + 1];
+        teamIdFromPath = String(pathArray[teamIndex + 1]);
       }
 
-      // Find matching team by abbreviation (we store the Companion App team id there)
+      console.log("Team ID from path:", teamIdFromPath);
+
       let matchedTeam = null;
       if (teamIdFromPath) {
         matchedTeam = await prisma.team.findFirst({
@@ -94,43 +95,72 @@ export async function POST(
         });
       }
 
+      console.log(
+        "Matched team:",
+        matchedTeam ? `${matchedTeam.name} (${matchedTeam.id})` : "NONE"
+      );
+
       let success = 0;
+      let updated = 0;
       let failed = 0;
 
       for (const p of body.rosterInfoList) {
         try {
-          await prisma.player.create({
-            data: {
+          const firstName = p.firstName || "Unknown";
+          const lastName = p.lastName || "Player";
+          const position = p.position || "UNK";
+
+          const existing = await prisma.player.findFirst({
+            where: {
               leagueId: league.id,
-              teamId: matchedTeam?.id || null,
-              firstName: p.firstName || "Unknown",
-              lastName: p.lastName || "Player",
-              position: p.position || "UNK",
-              jerseyNumber: p.jerseyNum ?? null,
-              overall: p.playerBestOvr ?? p.overallRating ?? p.ovr ?? null,
-              age: p.age ?? null,
-              speed: p.speedRating ?? null,
-              strength: p.strengthRating ?? null,
-              agility: p.agilityRating ?? null,
-              acceleration: p.accelRating ?? null,
-              awareness: p.awareRating ?? null,
-              development: p.devTrait != null ? String(p.devTrait) : null,
-              height: p.height
-                ? `${Math.floor(p.height / 12)}'${p.height % 12}"`
-                : null,
-              weight: p.weight ?? null,
+              firstName,
+              lastName,
             },
           });
-          success++;
+
+          const playerData = {
+            teamId: matchedTeam?.id || null,
+            position,
+            jerseyNumber: p.jerseyNum ?? null,
+            overall: p.playerBestOvr ?? p.overallRating ?? p.ovr ?? null,
+            age: p.age ?? null,
+            speed: p.speedRating ?? null,
+            strength: p.strengthRating ?? null,
+            agility: p.agilityRating ?? null,
+            acceleration: p.accelRating ?? null,
+            awareness: p.awareRating ?? null,
+            development: p.devTrait != null ? String(p.devTrait) : null,
+            height: p.height
+              ? `${Math.floor(p.height / 12)}'${p.height % 12}"`
+              : null,
+            weight: p.weight ?? null,
+          };
+
+          if (existing) {
+            await prisma.player.update({
+              where: { id: existing.id },
+              data: playerData,
+            });
+            updated++;
+          } else {
+            await prisma.player.create({
+              data: {
+                leagueId: league.id,
+                firstName,
+                lastName,
+                ...playerData,
+              },
+            });
+            success++;
+          }
         } catch (err: any) {
           failed++;
+          if (failed <= 3) console.error("Player error:", err.message);
         }
       }
 
       console.log(
-        `Roster done → Success: ${success}, Failed: ${failed}, Team linked: ${
-          matchedTeam ? matchedTeam.name : "none"
-        }`
+        `Roster done → Created: ${success}, Updated: ${updated}, Failed: ${failed}`
       );
     }
 
@@ -179,7 +209,7 @@ export async function POST(
             });
           }
         } catch (err: any) {
-          // ignore individual team errors
+          // ignore
         }
       }
     }
