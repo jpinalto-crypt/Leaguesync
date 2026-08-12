@@ -62,8 +62,7 @@ export async function POST(
       return NextResponse.json({ error: "League not active" }, { status: 402 });
     }
 
-    const rawText = await req.text();console.log("Raw body length:", rawText.length);
-console.log("Raw preview:", rawText.slice(0, 200));
+    const rawText = await req.text();
     let body: any = {};
     try {
       body = rawText ? JSON.parse(rawText) : {};
@@ -77,6 +76,24 @@ console.log("Raw preview:", rawText.slice(0, 200));
     if (body.rosterInfoList && Array.isArray(body.rosterInfoList)) {
       console.log("Parsing", body.rosterInfoList.length, "players");
 
+      // Get team id from path (e.g. team/775553046/roster)
+      let teamIdFromPath: string | null = null;
+      const teamIndex = pathArray.findIndex((p) => p === "team");
+      if (teamIndex !== -1 && pathArray[teamIndex + 1]) {
+        teamIdFromPath = pathArray[teamIndex + 1];
+      }
+
+      // Find matching team by abbreviation (we store the Companion App team id there)
+      let matchedTeam = null;
+      if (teamIdFromPath) {
+        matchedTeam = await prisma.team.findFirst({
+          where: {
+            leagueId: league.id,
+            abbreviation: teamIdFromPath,
+          },
+        });
+      }
+
       let success = 0;
       let failed = 0;
 
@@ -85,6 +102,7 @@ console.log("Raw preview:", rawText.slice(0, 200));
           await prisma.player.create({
             data: {
               leagueId: league.id,
+              teamId: matchedTeam?.id || null,
               firstName: p.firstName || "Unknown",
               lastName: p.lastName || "Player",
               position: p.position || "UNK",
@@ -97,7 +115,9 @@ console.log("Raw preview:", rawText.slice(0, 200));
               acceleration: p.accelRating ?? null,
               awareness: p.awareRating ?? null,
               development: p.devTrait != null ? String(p.devTrait) : null,
-              height: p.height ? `${Math.floor(p.height / 12)}'${p.height % 12}"` : null,
+              height: p.height
+                ? `${Math.floor(p.height / 12)}'${p.height % 12}"`
+                : null,
               weight: p.weight ?? null,
             },
           });
@@ -107,7 +127,11 @@ console.log("Raw preview:", rawText.slice(0, 200));
         }
       }
 
-      console.log(`Roster done → Success: ${success}, Failed: ${failed}`);
+      console.log(
+        `Roster done → Success: ${success}, Failed: ${failed}, Team linked: ${
+          matchedTeam ? matchedTeam.name : "none"
+        }`
+      );
     }
 
     // ========== STANDINGS ==========
@@ -116,7 +140,8 @@ console.log("Raw preview:", rawText.slice(0, 200));
 
       for (const s of body.teamStandingInfoList) {
         try {
-          const name = s.teamName || s.displayName || String(s.teamId) || "Unknown";
+          const name =
+            s.teamName || s.displayName || String(s.teamId) || "Unknown";
 
           const existing = await prisma.team.findFirst({
             where: { leagueId: league.id, name },
@@ -133,6 +158,7 @@ console.log("Raw preview:", rawText.slice(0, 200));
                 division: s.divisionName || s.divName || existing.division,
                 conference: s.conferenceName || existing.conference,
                 capAvailable: s.capRoom ?? existing.capAvailable,
+                abbreviation: String(s.teamId || existing.abbreviation),
               },
             });
           } else {
@@ -153,14 +179,14 @@ console.log("Raw preview:", rawText.slice(0, 200));
             });
           }
         } catch (err: any) {
-          // ignore
+          // ignore individual team errors
         }
       }
     }
 
     // ========== SCHEDULES ==========
     if (body.gameScheduleInfoList && Array.isArray(body.gameScheduleInfoList)) {
-      console.log("Parsing schedules...", body.gameScheduleInfoList.length, "games");
+      console.log("Parsing schedules...", body.gameScheduleInfoList.length);
 
       for (const g of body.gameScheduleInfoList) {
         try {
