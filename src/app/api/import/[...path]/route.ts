@@ -4,23 +4,50 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ path?: string[] }> }
+) {
+  const { path } = await params;
+  const token = path?.[0];
+
+  if (!token) {
+    return NextResponse.json({ error: "Missing token" }, { status: 400 });
+  }
+
+  const league = await prisma.league.findUnique({
+    where: { exportToken: token },
+    select: { name: true, status: true, isFree: true, slug: true },
+  });
+
+  if (!league) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    league: league.name,
+    slug: league.slug,
+    status: league.status,
+    ready: league.status === "ACTIVE" || league.isFree,
+  });
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ path?: string[] }> }
 ) {
   const { path } = await params;
   const pathArray = path || [];
+  const token = pathArray[0];
+  const pathStr = pathArray.slice(1).join("/");
 
   console.log("=== IMPORT HIT ===");
-  console.log("Full path:", pathArray.join("/"));
+  console.log("Token:", token);
+  console.log("Path:", pathStr);
 
-  // First segment is the token
-  const token = pathArray[0];
   if (!token) {
     return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
-
-  console.log("Token:", token);
 
   try {
     const league = await prisma.league.findUnique({
@@ -28,33 +55,107 @@ export async function POST(
     });
 
     if (!league) {
-      console.log("League not found");
       return NextResponse.json({ error: "Invalid token" }, { status: 404 });
     }
 
-    console.log("League found:", league.slug);
+    if (league.status !== "ACTIVE" && !league.isFree) {
+      return NextResponse.json({ error: "League not active" }, { status: 402 });
+    }
 
     const rawText = await req.text();
-    console.log("Body length:", rawText.length);
-    console.log("Preview:", rawText.slice(0, 300));
+    let body: any = {};
+    try {
+      body = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      body = {};
+    }
 
-    return NextResponse.json({
-      success: true,
-      bodyLength: rawText.length,
-    });
+    console.log("Body keys:", Object.keys(body));
+
+    // ========== ROSTERS ==========
+    if (body.rosterInfoList && Array.isArray(body.rosterInfoList)) {
+      console.log("Parsing", body.rosterInfoList.length, "players");
+
+      let success = 0;
+      let failed = 0;
+
+      for (const p of body.rosterInfoList) {
+        try {
+          await prisma.player.create({
+            data: {
+              leagueId: league.id,
+              firstName: p.firstName || "Unknown",
+              lastName: p.lastName || "Player",
+              position: p.position || "UNK",
+              jerseyNumber: p.jerseyNum ?? null,
+              overall: p.playerBestOvr ?? p.overallRating ?? p.ovr ?? null,
+              age: p.age ?? null,
+              speed: p.speedRating ?? null,
+              strength: p.strengthRating ?? null,
+              agility: p.agilityRating ?? null,
+              acceleration: p.accelRating ?? null,
+              awareness: p.awareRating ?? null,
+              development: p.devTrait != null ? String(p.devTrait) : null,
+              height: p.height ? `${Math.floor(p.height / 12)}'${p.height % 12}"` : null,
+              weight: p.weight ?? null,
+            },
+          });
+          success++;
+        } catch (err: any) {
+          failed++;
+          // Only log the first few errors to avoid spam
+          if (failed <= 3) {
+            console.error("Player create error:", err.message);
+          }
+        }
+      }
+
+      console.log(`Roster done → Success: ${success}, Failed: ${failed}`);
+    }
+
+    // ========== STANDINGS ==========
+    if (body.teamStandingInfoList && Array.isArray(body.teamStandingInfoList)) {
+      console.log("Parsing standings...", body.teamStandingInfoList.length);
+
+      for (const s of body.teamStandingInfoList) {
+        try {
+          const name = s.teamName || s.displayName || String(s.teamId) || "Unknown";
+
+          await prisma.team.create({
+            data: {
+              leagueId: league.id,
+              name,
+              abbreviation: String(s.teamId || name.slice(0, 3)),
+              recordWins: s.totalWins ?? s.wins ?? 0,
+              recordLosses: s.totalLosses ?? s.losses ?? 0,
+              recordTies: s.totalTies ?? s.ties ?? 0,
+              overall: s.teamOvr ?? null,
+              division: s.divisionName || s.divName || null,
+              conference: s.conferenceName || null,
+              capAvailable: s.capRoom ?? null,
+              isCpu: true,
+            },
+          });
+        } catch (err: any) {
+          // ignore duplicates for now
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("Error:", err);
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    console.error("Import error:", err);
+    return NextResponse.json({ error: "Import failed" }, { status: 500 });
   }
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ path?: string[] }> }
-) {
-  const { path } = await params;
-  return NextResponse.json({
-    message: "Import catch-all alive",
-    path: path?.join("/") || "none",
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+    },
   });
 }
