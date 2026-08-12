@@ -142,10 +142,18 @@ export default async function LeaguePage({
         </section>
 
         {/* Players */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4">
-            Players (showing top 100 of {league._count.players})
-          </h2>
+<section>
+  <div className="flex items-center justify-between mb-4">
+    <h2 className="text-xl font-semibold">
+      Players (showing top 100 of {league._count.players})
+    </h2>
+    <Link
+      href={`/leagues/${slug}/players`}
+      className="text-sm text-emerald-400 hover:text-emerald-300"
+    >
+      View all players →
+    </Link>
+  </div>
 
           {league.players.length === 0 ? (
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500">
