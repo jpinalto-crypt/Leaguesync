@@ -1,10 +1,7 @@
-// force rebuild
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -29,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "League already active" }, { status: 400 });
   }
 
-  // If no Stripe keys are set, auto-activate (good for testing)
+  // Demo mode when no Stripe key is set
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_PRICE_ID) {
     await prisma.league.update({
       where: { id: leagueId },
@@ -40,6 +37,8 @@ export async function POST(req: NextRequest) {
       demo: true,
     });
   }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   const checkoutSession = await stripe.checkout.sessions.create({
     mode: "payment",
