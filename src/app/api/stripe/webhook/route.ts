@@ -1,17 +1,16 @@
-// force rebuild
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
 
-  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: "Missing signature or Stripe key" }, { status: 400 });
   }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
   let event: Stripe.Event;
   try {
