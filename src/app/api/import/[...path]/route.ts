@@ -1,7 +1,3 @@
-console.log("Body keys:", Object.keys(body));
-if (body.gameScheduleInfoList) {
-  console.log("FOUND gameScheduleInfoList");
-}
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -107,10 +103,6 @@ export async function POST(
           success++;
         } catch (err: any) {
           failed++;
-          // Only log the first few errors to avoid spam
-          if (failed <= 3) {
-            console.error("Player create error:", err.message);
-          }
         }
       }
 
@@ -125,33 +117,46 @@ export async function POST(
         try {
           const name = s.teamName || s.displayName || String(s.teamId) || "Unknown";
 
-          await prisma.team.create({
-            data: {
-              leagueId: league.id,
-              name,
-              abbreviation: String(s.teamId || name.slice(0, 3)),
-              recordWins: s.totalWins ?? s.wins ?? 0,
-              recordLosses: s.totalLosses ?? s.losses ?? 0,
-              recordTies: s.totalTies ?? s.ties ?? 0,
-              overall: s.teamOvr ?? null,
-              division: s.divisionName || s.divName || null,
-              conference: s.conferenceName || null,
-              capAvailable: s.capRoom ?? null,
-              isCpu: true,
-            },
+          const existing = await prisma.team.findFirst({
+            where: { leagueId: league.id, name },
           });
+
+          if (existing) {
+            await prisma.team.update({
+              where: { id: existing.id },
+              data: {
+                recordWins: s.totalWins ?? s.wins ?? existing.recordWins,
+                recordLosses: s.totalLosses ?? s.losses ?? existing.recordLosses,
+                recordTies: s.totalTies ?? s.ties ?? existing.recordTies,
+                overall: s.teamOvr ?? existing.overall,
+                division: s.divisionName || s.divName || existing.division,
+                conference: s.conferenceName || existing.conference,
+                capAvailable: s.capRoom ?? existing.capAvailable,
+              },
+            });
+          } else {
+            await prisma.team.create({
+              data: {
+                leagueId: league.id,
+                name,
+                abbreviation: String(s.teamId || name.slice(0, 3)),
+                recordWins: s.totalWins ?? s.wins ?? 0,
+                recordLosses: s.totalLosses ?? s.losses ?? 0,
+                recordTies: s.totalTies ?? s.ties ?? 0,
+                overall: s.teamOvr ?? null,
+                division: s.divisionName || s.divName || null,
+                conference: s.conferenceName || null,
+                capAvailable: s.capRoom ?? null,
+                isCpu: true,
+              },
+            });
+          }
         } catch (err: any) {
-          // ignore duplicates for now
+          // ignore
         }
       }
     }
 
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error("Import error:", err);
-    return NextResponse.json({ error: "Import failed" }, { status: 500 });
-  }
-}
     // ========== SCHEDULES ==========
     if (body.gameScheduleInfoList && Array.isArray(body.gameScheduleInfoList)) {
       console.log("Parsing schedules...", body.gameScheduleInfoList.length, "games");
@@ -162,7 +167,6 @@ export async function POST(
           const homeName = g.homeTeamName || g.homeTeam || "Home";
           const awayName = g.awayTeamName || g.awayTeam || "Away";
 
-          // Find teams by name
           const homeTeam = await prisma.team.findFirst({
             where: { leagueId: league.id, name: homeName },
           });
@@ -172,7 +176,6 @@ export async function POST(
 
           if (!homeTeam || !awayTeam) continue;
 
-          // Avoid duplicates
           const existing = await prisma.game.findFirst({
             where: {
               leagueId: league.id,
@@ -210,6 +213,14 @@ export async function POST(
         }
       }
     }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("Import error:", err);
+    return NextResponse.json({ error: "Import failed" }, { status: 500 });
+  }
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
