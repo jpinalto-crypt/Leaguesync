@@ -53,59 +53,47 @@ export async function POST(
     }
 
     const pathStr = path ? path.join("/") : "";
-    console.log("Export received:", league.slug, pathStr, "body keys:", Object.keys(body));
+    console.log("Export received:", league.slug, pathStr);
+    console.log("Body keys:", Object.keys(body));
 
     // ========== ROSTERS ==========
     if (body.rosterInfoList && Array.isArray(body.rosterInfoList)) {
       console.log("Parsing roster with", body.rosterInfoList.length, "players");
 
-      // Try to extract team id from the path (e.g. /xbsx/.../team/775553046/roster)
-      let teamIdFromPath: string | null = null;
-      if (path) {
-        const teamIndex = path.findIndex((p) => p === "team");
-        if (teamIndex !== -1 && path[teamIndex + 1]) {
-          teamIdFromPath = path[teamIndex + 1];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const p of body.rosterInfoList) {
+        try {
+          const firstName = p.firstName || "Unknown";
+          const lastName = p.lastName || "Player";
+          const position = p.position || "UNK";
+
+          await prisma.player.create({
+            data: {
+              leagueId: league.id,
+              firstName,
+              lastName,
+              position,
+              jerseyNumber: p.jerseyNum ?? null,
+              overall: p.playerBestOvr ?? p.overallRating ?? p.ovr ?? null,
+              age: p.age ?? null,
+              speed: p.speedRating ?? null,
+              strength: p.strengthRating ?? null,
+              agility: p.agilityRating ?? null,
+              acceleration: p.accelRating ?? null,
+              awareness: p.awareRating ?? null,
+              development: p.devTrait != null ? String(p.devTrait) : null,
+            },
+          });
+          successCount++;
+        } catch (err: any) {
+          errorCount++;
+          console.error("Failed to create player:", err.message);
         }
       }
 
-      // Find or create a team for this roster
-      let team = null;
-      if (teamIdFromPath) {
-        team = league.teams.find((t) => t.abbreviation === teamIdFromPath);
-      }
-
-      for (const p of body.rosterInfoList) {
-        const firstName = p.firstName || "Unknown";
-        const lastName = p.lastName || "Player";
-        const position = p.position || "UNK";
-
-        await prisma.player.create({
-          data: {
-            leagueId: league.id,
-            teamId: team?.id || null,
-            firstName,
-            lastName,
-            position,
-            jerseyNumber: p.jerseyNum ?? null,
-            overall: p.playerBestOvr ?? p.overallRating ?? p.ovr ?? null,
-            age: p.age ?? null,
-            height: p.height ? `${Math.floor(p.height / 12)}'${p.height % 12}"` : null,
-            weight: p.weight ?? null,
-            speed: p.speedRating ?? null,
-            strength: p.strengthRating ?? null,
-            agility: p.agilityRating ?? null,
-            acceleration: p.accelRating ?? null,
-            awareness: p.awareRating ?? null,
-            development: p.devTrait != null ? String(p.devTrait) : null,
-            tradeValue: p.tradeValue ?? null,
-            contractYears: p.contractYearsLeft ?? null,
-            salary: p.capHit ?? null,
-            isOnTradeBlock: !!p.isOnTradeBlock,
-          },
-        }).catch(() => {
-          // ignore individual player errors for now
-        });
-      }
+      console.log(`Roster import done. Success: ${successCount}, Errors: ${errorCount}`);
     }
 
     // ========== STANDINGS ==========
@@ -113,47 +101,51 @@ export async function POST(
       console.log("Parsing standings with", body.teamStandingInfoList.length, "teams");
 
       for (const s of body.teamStandingInfoList) {
-        const teamName =
-          s.teamName || s.displayName || s.teamDisplayName || s.teamId || "Unknown Team";
+        try {
+          const teamName =
+            s.teamName || s.displayName || s.teamDisplayName || String(s.teamId) || "Unknown Team";
 
-        const existing = league.teams.find(
-          (t) => t.name === teamName || t.abbreviation === String(s.teamId)
-        );
+          const existing = league.teams.find(
+            (t) => t.name === teamName || t.abbreviation === String(s.teamId)
+          );
 
-        if (existing) {
-          await prisma.team.update({
-            where: { id: existing.id },
-            data: {
-              recordWins: s.totalWins ?? s.wins ?? existing.recordWins,
-              recordLosses: s.totalLosses ?? s.losses ?? existing.recordLosses,
-              recordTies: s.totalTies ?? s.ties ?? existing.recordTies,
-              overall: s.teamOvr ?? s.overall ?? existing.overall,
-              division: s.divisionName || s.divName || existing.division,
-              conference: s.conferenceName || existing.conference,
-              capAvailable: s.capRoom ?? existing.capAvailable,
-            },
-          });
-        } else {
-          await prisma.team.create({
-            data: {
-              leagueId: league.id,
-              name: teamName,
-              abbreviation: String(s.teamId || s.teamAbbr || teamName.slice(0, 3)),
-              recordWins: s.totalWins ?? s.wins ?? 0,
-              recordLosses: s.totalLosses ?? s.losses ?? 0,
-              recordTies: s.totalTies ?? s.ties ?? 0,
-              overall: s.teamOvr ?? s.overall ?? null,
-              division: s.divisionName || s.divName || null,
-              conference: s.conferenceName || null,
-              capAvailable: s.capRoom ?? null,
-              isCpu: true,
-            },
-          });
+          if (existing) {
+            await prisma.team.update({
+              where: { id: existing.id },
+              data: {
+                recordWins: s.totalWins ?? s.wins ?? existing.recordWins,
+                recordLosses: s.totalLosses ?? s.losses ?? existing.recordLosses,
+                recordTies: s.totalTies ?? s.ties ?? existing.recordTies,
+                overall: s.teamOvr ?? s.overall ?? existing.overall,
+                division: s.divisionName || s.divName || existing.division,
+                conference: s.conferenceName || existing.conference,
+                capAvailable: s.capRoom ?? existing.capAvailable,
+              },
+            });
+          } else {
+            await prisma.team.create({
+              data: {
+                leagueId: league.id,
+                name: teamName,
+                abbreviation: String(s.teamId || s.teamAbbr || teamName.slice(0, 3)),
+                recordWins: s.totalWins ?? s.wins ?? 0,
+                recordLosses: s.totalLosses ?? s.losses ?? 0,
+                recordTies: s.totalTies ?? s.ties ?? 0,
+                overall: s.teamOvr ?? s.overall ?? null,
+                division: s.divisionName || s.divName || null,
+                conference: s.conferenceName || null,
+                capAvailable: s.capRoom ?? null,
+                isCpu: true,
+              },
+            });
+          }
+        } catch (err: any) {
+          console.error("Failed to create/update team:", err.message);
         }
       }
     }
 
-    // Store raw for debugging
+    // Store raw data
     await prisma.weeklyExport.create({
       data: {
         leagueId: league.id,
@@ -161,7 +153,7 @@ export async function POST(
         type: pathStr || "UNKNOWN",
         rawData: rawText.slice(0, 80000),
       },
-    }).catch(() => {});
+    }).catch((err) => console.error("Failed to save raw export:", err.message));
 
     return new NextResponse(JSON.stringify({ success: true }), {
       status: 200,
