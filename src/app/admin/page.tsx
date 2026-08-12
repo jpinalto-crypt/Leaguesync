@@ -26,18 +26,30 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="font-bold text-xl tracking-tight">
-            <span className="text-emerald-400">Madden</span> League HQ
-          </Link>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-amber-400 font-medium">Admin</span>
-            <Link href="/dashboard" className="text-zinc-400 hover:text-white">
-              Dashboard
-            </Link>
-          </div>
-        </div>
-      </header>
+  <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+    <Link href="/dashboard" className="font-bold text-xl tracking-tight">
+      <span className="text-emerald-400">Madden</span> League HQ
+    </Link>
+    <div className="flex items-center gap-4 text-sm">
+      {session?.user?.role === "ADMIN" && (
+        <Link href="/admin" className="text-amber-400 hover:text-amber-300">
+          Admin
+        </Link>
+      )}
+      <Link href="/dashboard" className="text-zinc-400 hover:text-white">
+        Dashboard
+      </Link>
+      {session && (
+        <a
+          href="/api/auth/signout"
+          className="text-zinc-400 hover:text-red-400 transition"
+        >
+          Sign Out
+        </a>
+      )}
+    </div>
+  </div>
+</header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>

@@ -7,33 +7,30 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="font-bold text-xl tracking-tight">
-            <span className="text-emerald-400">Madden</span> League HQ
-          </Link>
-          <nav className="flex items-center gap-4">
-            {session ? (
-              <>
-                <Link href="/dashboard" className="text-sm text-zinc-300 hover:text-white transition">
-                  Dashboard
-                </Link>
-                {session.user.role === "ADMIN" && (
-                  <Link href="/admin" className="text-sm text-amber-400 hover:text-amber-300 transition">
-                    Admin
-                  </Link>
-                )}
-              </>
-            ) : (
-              <Link
-                href="/login"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-              >
-                Sign in with Discord
-              </Link>
-            )}
-          </nav>
-        </div>
-      </header>
+  <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+    <Link href="/dashboard" className="font-bold text-xl tracking-tight">
+      <span className="text-emerald-400">Madden</span> League HQ
+    </Link>
+    <div className="flex items-center gap-4 text-sm">
+      {session?.user?.role === "ADMIN" && (
+        <Link href="/admin" className="text-amber-400 hover:text-amber-300">
+          Admin
+        </Link>
+      )}
+      <Link href="/dashboard" className="text-zinc-400 hover:text-white">
+        Dashboard
+      </Link>
+      {session && (
+        <a
+          href="/api/auth/signout"
+          className="text-zinc-400 hover:text-red-400 transition"
+        >
+          Sign Out
+        </a>
+      )}
+    </div>
+  </div>
+</header>
 
       <main className="flex-1">
         <section className="max-w-6xl mx-auto px-4 py-24 text-center">
