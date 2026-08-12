@@ -19,6 +19,10 @@ export default async function LeaguePage({
       teams: {
         orderBy: [{ recordWins: "desc" }, { name: "asc" }],
       },
+      players: {
+        orderBy: [{ overall: "desc" }, { lastName: "asc" }],
+        take: 100, // show top 100 for now
+      },
       owner: { select: { name: true } },
       _count: {
         select: {
@@ -57,6 +61,7 @@ export default async function LeaguePage({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
+        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold">{league.name}</h1>
@@ -71,88 +76,103 @@ export default async function LeaguePage({
             </span>
           </div>
           <p className="text-zinc-400">
-            Season {league.season || "2026"} · Owner: {league.owner.name || "Unknown"} ·{" "}
-            {league._count.players} players · {league._count.weeklyExports} exports received
+            {league._count.players} players · {league.teams.length} teams ·{" "}
+            {league._count.weeklyExports} exports received
           </p>
         </div>
 
-        {!isActive && isOwner && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-8">
-            <h2 className="font-semibold text-lg text-amber-300 mb-2">
-              Activate this league — $10 one-time
-            </h2>
-            <p className="text-zinc-300 text-sm mb-4">
-              Payment unlocks the import URL so you can export from the Madden Companion App.
-            </p>
-            <ActivateButton leagueId={league.id} />
-          </div>
-        )}
-
+        {/* Export URL */}
         {isActive && (
           <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-8">
             <h2 className="font-semibold text-lg text-emerald-300 mb-2">
-              Export URL (paste into Madden Companion App)
+              Export URL
             </h2>
-            <p className="text-zinc-400 text-sm mb-3">
-              In the Companion App → Manage Franchise → Export → paste this URL.
-              Export League Info first, then Rosters, then Weekly Stats / Standings.
-            </p>
             <code className="block bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-sm break-all text-emerald-300 select-all">
               {exportUrl}
             </code>
           </div>
         )}
 
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Teams & Standings</h2>
-            <span className="text-sm text-zinc-500">{league.teams.length} teams</span>
-          </div>
+        {/* Teams */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold mb-4">
+            Teams & Standings ({league.teams.length})
+          </h2>
 
           {league.teams.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center text-zinc-500">
-              No teams imported yet.
-              <br />
-              <span className="text-sm">
-                Export Standings / Weekly Stats from the Companion App to see teams here.
-              </span>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500">
+              No teams yet. Export standings from the Companion App.
             </div>
           ) : (
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-800 text-left text-zinc-400">
-                    <th className="px-4 py-3 font-medium">Team</th>
-                    <th className="px-4 py-3 font-medium">Record</th>
-                    <th className="px-4 py-3 font-medium">OVR</th>
-                    <th className="px-4 py-3 font-medium">Division</th>
-                    <th className="px-4 py-3 font-medium">Conference</th>
-                    <th className="px-4 py-3 font-medium">Cap</th>
+                    <th className="px-4 py-3">Team</th>
+                    <th className="px-4 py-3">Record</th>
+                    <th className="px-4 py-3">OVR</th>
+                    <th className="px-4 py-3">Division</th>
+                    <th className="px-4 py-3">Conference</th>
                   </tr>
                 </thead>
                 <tbody>
                   {league.teams.map((team) => (
-                    <tr
-                      key={team.id}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/30"
-                    >
-                      <td className="px-4 py-3 font-medium">
-                        {team.name}
-                        {team.isCpu && (
-                          <span className="ml-2 text-xs text-zinc-500">CPU</span>
-                        )}
-                      </td>
+                    <tr key={team.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <td className="px-4 py-3 font-medium">{team.name}</td>
                       <td className="px-4 py-3">
                         {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
                       </td>
                       <td className="px-4 py-3">{team.overall ?? "—"}</td>
                       <td className="px-4 py-3 text-zinc-400">{team.division || "—"}</td>
                       <td className="px-4 py-3 text-zinc-400">{team.conference || "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">
-                        {team.capAvailable
-                          ? `$${(team.capAvailable / 1000000).toFixed(1)}M`
-                          : "—"}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Players */}
+        <section>
+          <h2 className="text-xl font-semibold mb-4">
+            Players (showing top 100 of {league._count.players})
+          </h2>
+
+          {league.players.length === 0 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500">
+              No players yet. Export rosters from the Companion App.
+            </div>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-left text-zinc-400">
+                    <th className="px-4 py-3">Name</th>
+                    <th className="px-4 py-3">Pos</th>
+                    <th className="px-4 py-3">OVR</th>
+                    <th className="px-4 py-3">Age</th>
+                    <th className="px-4 py-3">SPD</th>
+                    <th className="px-4 py-3">STR</th>
+                    <th className="px-4 py-3">AGI</th>
+                    <th className="px-4 py-3">Dev</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {league.players.map((player) => (
+                    <tr key={player.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                      <td className="px-4 py-3 font-medium">
+                        {player.firstName} {player.lastName}
                       </td>
+                      <td className="px-4 py-3">{player.position}</td>
+                      <td className="px-4 py-3 font-semibold text-emerald-400">
+                        {player.overall ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-400">{player.age ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{player.speed ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{player.strength ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{player.agility ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{player.development ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
