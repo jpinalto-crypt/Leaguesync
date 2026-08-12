@@ -3,13 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// For production switch to:
-// provider = "postgresql"
-// url      = env("DATABASE_URL")
 
 enum Role {
   USER
@@ -82,11 +78,11 @@ model League {
   slug            String       @unique
   description     String?
   status          LeagueStatus @default(PENDING_PAYMENT)
-  isFree          Boolean      @default(false) // Admin-created free leagues
-  exportToken     String       @unique @default(cuid()) // Unique token for Madden Companion App export URL
+  isFree          Boolean      @default(false)
+  exportToken     String       @unique @default(cuid())
   discordGuildId  String?
   discordInvite   String?
-  season          String?      // e.g. "2026"
+  season          String?
   currentWeek     Int?
   ownerId         String
   stripeSessionId String?
@@ -107,8 +103,8 @@ model LeagueMember {
   id        String   @id @default(cuid())
   leagueId  String
   userId    String
-  teamId    String?  // Which team they control
-  role      String   @default("OWNER") // OWNER, COMMISSIONER, MEMBER
+  teamId    String?
+  role      String   @default("OWNER")
   joinedAt  DateTime @default(now())
 
   league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
@@ -119,118 +115,118 @@ model LeagueMember {
 }
 
 model Team {
-  id            String   @id @default(cuid())
-  leagueId      String
-  name          String
-  abbreviation  String?  // e.g. DAL, KC
-  city          String?
-  division      String?
-  conference    String?
-  overall       Int?
-  recordWins    Int      @default(0)
-  recordLosses  Int      @default(0)
-  recordTies    Int      @default(0)
-  capAvailable  Int?     // in dollars or simplified
-  offenseScheme String?
-  defenseScheme String?
-  offDevs       Int?
-  defDevs       Int?
-  injuries      Int      @default(0)
-  isCpu         Boolean  @default(false)
-  primaryColor  String?
+  id             String   @id @default(cuid())
+  leagueId       String
+  name           String
+  abbreviation   String?
+  city           String?
+  division       String?
+  conference     String?
+  overall        Int?
+  recordWins     Int      @default(0)
+  recordLosses   Int      @default(0)
+  recordTies     Int      @default(0)
+  capAvailable   Int?
+  offenseScheme  String?
+  defenseScheme  String?
+  offDevs        Int?
+  defDevs        Int?
+  injuries       Int      @default(0)
+  isCpu          Boolean  @default(false)
+  primaryColor   String?
   secondaryColor String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  players       Player[]
-  members       LeagueMember[]
-  homeGames     Game[]   @relation("HomeTeam")
-  awayGames     Game[]   @relation("AwayTeam")
-  tradesAsTeamA Trade[]  @relation("TradeTeamA")
-  tradesAsTeamB Trade[]  @relation("TradeTeamB")
+  league         League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  players        Player[]
+  members        LeagueMember[]
+  homeGames      Game[]   @relation("HomeTeam")
+  awayGames      Game[]   @relation("AwayTeam")
+  tradesAsTeamA  Trade[]  @relation("TradeTeamA")
+  tradesAsTeamB  Trade[]  @relation("TradeTeamB")
 }
 
 model Player {
-  id            String   @id @default(cuid())
-  leagueId      String
-  teamId        String?
-  firstName     String
-  lastName      String
-  position      String
-  jerseyNumber  Int?
-  overall       Int?
-  age           Int?
-  height        String?
-  weight        Int?
-  speed         Int?
-  strength      Int?
-  agility       Int?
-  acceleration  Int?
-  awareness     Int?
-  development   String?  // Normal, Star, Superstar, X-Factor
-  tradeValue    Int?
-  contractYears Int?
-  salary        Int?
-  isOnTradeBlock Boolean @default(false)
-  injuryStatus  String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(cuid())
+  leagueId       String
+  teamId         String?
+  firstName      String
+  lastName       String
+  position       String
+  jerseyNumber   Int?
+  overall        Int?
+  age            Int?
+  height         String?
+  weight         Int?
+  speed          Int?
+  strength       Int?
+  agility        Int?
+  acceleration   Int?
+  awareness      Int?
+  development    String?
+  tradeValue     Int?
+  contractYears  Int?
+  salary         Int?
+  isOnTradeBlock Boolean  @default(false)
+  injuryStatus   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  team          Team?    @relation(fields: [teamId], references: [id])
+  league         League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  team           Team?    @relation(fields: [teamId], references: [id])
 
   @@index([leagueId, position])
   @@index([leagueId, lastName])
 }
 
 model Game {
-  id            String   @id @default(cuid())
-  leagueId      String
-  week          Int
-  seasonType    String   @default("Regular") // Preseason, Regular, Playoffs
-  homeTeamId    String
-  awayTeamId    String
-  homeScore     Int?
-  awayScore     Int?
-  isComplete    Boolean  @default(false)
-  playedAt      DateTime?
-  createdAt     DateTime @default(now())
+  id         String   @id @default(cuid())
+  leagueId   String
+  week       Int
+  seasonType String   @default("Regular")
+  homeTeamId String
+  awayTeamId String
+  homeScore  Int?
+  awayScore  Int?
+  isComplete Boolean  @default(false)
+  playedAt   DateTime?
+  createdAt  DateTime @default(now())
 
-  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  homeTeam      Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam      Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeam   Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam   Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
 
   @@index([leagueId, week])
 }
 
 model Trade {
-  id            String   @id @default(cuid())
-  leagueId      String
-  createdById   String
-  teamAId       String
-  teamBId       String
-  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
-  notes         String?
-  teamAPlayers  String?  // JSON array of player IDs for simplicity
-  teamBPlayers  String?
-  teamAPicks    String?
-  teamBPicks    String?
-  createdAt     DateTime @default(now())
-  resolvedAt    DateTime?
+  id           String   @id @default(cuid())
+  leagueId     String
+  createdById  String
+  teamAId      String
+  teamBId      String
+  status       String   @default("PENDING")
+  notes        String?
+  teamAPlayers String?
+  teamBPlayers String?
+  teamAPicks   String?
+  teamBPicks   String?
+  createdAt    DateTime @default(now())
+  resolvedAt   DateTime?
 
-  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
-  createdBy     User     @relation("TradeCreator", fields: [createdById], references: [id])
-  teamA         Team     @relation("TradeTeamA", fields: [teamAId], references: [id])
-  teamB         Team     @relation("TradeTeamB", fields: [teamBId], references: [id])
-  votes         TradeVote[]
+  league       League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  createdBy    User     @relation("TradeCreator", fields: [createdById], references: [id])
+  teamA        Team     @relation("TradeTeamA", fields: [teamAId], references: [id])
+  teamB        Team     @relation("TradeTeamB", fields: [teamBId], references: [id])
+  votes        TradeVote[]
 }
 
 model TradeVote {
   id        String   @id @default(cuid())
   tradeId   String
   userId    String
-  vote      String   // APPROVE, REJECT
+  vote      String
   createdAt DateTime @default(now())
 
   trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
@@ -240,14 +236,14 @@ model TradeVote {
 }
 
 model WeeklyExport {
-  id        String   @id @default(cuid())
-  leagueId  String
-  week      Int
-  type      String   // LEAGUE_INFO, ROSTERS, WEEKLY_STATS
-  rawData   String?  // Store JSON if needed for debugging
+  id         String   @id @default(cuid())
+  leagueId   String
+  week       Int
+  type       String
+  rawData    String?
   receivedAt DateTime @default(now())
 
-  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
 
   @@unique([leagueId, week, type])
 }
