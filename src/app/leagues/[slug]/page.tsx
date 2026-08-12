@@ -126,10 +126,11 @@ export default async function LeaguePage({
                 <tbody>
                   {league.teams.map((team) => (
                     <tr key={team.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-4 py-3 font-medium">{team.name}</td>
-                      <td className="px-4 py-3">
-                        {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
-                      </td>
+                      <td className="px-4 py-3 font-medium">
+  <Link href={`/leagues/${slug}/teams/${team.id}`} className="hover:text-emerald-400">
+    {team.name}
+  </Link>
+</td>
                       <td className="px-4 py-3">{team.overall ?? "—"}</td>
                       <td className="px-4 py-3 text-zinc-400">{team.division || "—"}</td>
                       <td className="px-4 py-3 text-zinc-400">{team.conference || "—"}</td>
