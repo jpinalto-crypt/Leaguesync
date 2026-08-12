@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ token: string; path?: string[] }> }
 ) {
   const { token } = await params;
 
@@ -26,9 +26,9 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ token: string }> }
+  { params }: { params: Promise<{ token: string; path?: string[] }> }
 ) {
-  const { token } = await params;
+  const { token, path } = await params;
 
   try {
     const league = await prisma.league.findUnique({
@@ -40,55 +40,51 @@ export async function POST(
     }
 
     if (league.status !== "ACTIVE" && !league.isFree) {
-      return NextResponse.json(
-        { error: "League is not active" },
-        { status: 402 }
-      );
+      return NextResponse.json({ error: "League is not active" }, { status: 402 });
     }
 
-    // Read the body safely
-    let body: any = null;
+    let body: any = {};
     try {
       body = await req.json();
     } catch {
-      // Some exports might send empty or different content types
       body = {};
     }
 
-    console.log("Received export for league:", league.slug);
-    console.log("Body keys:", body ? Object.keys(body) : "no body");
+    const pathStr = path ? path.join("/") : "";
+    console.log("Export received:", {
+      league: league.slug,
+      path: pathStr,
+      keys: Object.keys(body),
+    });
 
-    // For now just accept everything and return success
-    // (we can parse teams/players later once the connection works)
-
+    // Store raw data for now
     await prisma.weeklyExport.create({
       data: {
         leagueId: league.id,
         week: body?.weekIndex ?? body?.week ?? 0,
-        type: "UNKNOWN",
+        type: pathStr || "UNKNOWN",
         rawData: JSON.stringify(body).slice(0, 100000),
       },
     }).catch(() => {});
 
-    // Return a simple success response that the Companion App likes
-    return new NextResponse("OK", { status: 200 });
+    // Return simple success that the Companion App expects
+    return new NextResponse(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err: any) {
     console.error("Import error:", err);
-    return NextResponse.json(
-      { error: "Import failed", detail: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Import failed" }, { status: 500 });
   }
 }
 
-// Handle preflight / OPTIONS if needed
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "*",
     },
   });
 }
