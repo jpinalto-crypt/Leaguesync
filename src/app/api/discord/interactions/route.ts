@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   let isValid = false;
   try {
-    isValid = verifyKey(body, signature, timestamp, publicKey);
+    isValid = await verifyKey(body, signature, timestamp, publicKey);
     console.log("Signature valid:", isValid);
   } catch (err: any) {
     console.log("verifyKey error:", err.message);
@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
   const interaction = JSON.parse(body);
   console.log("Interaction type:", interaction.type);
 
-  // Respond to Discord's ping
   if (interaction.type === InteractionType.PING) {
     console.log("Responding with PONG");
     return NextResponse.json({ type: InteractionResponseType.PONG });
