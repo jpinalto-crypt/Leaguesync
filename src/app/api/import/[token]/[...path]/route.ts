@@ -1,3 +1,29 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ token: string; path?: string[] }> }
+) {
+  const { token } = await params;
+
+  const league = await prisma.league.findUnique({
+    where: { exportToken: token },
+    select: { name: true, status: true, isFree: true, slug: true },
+  });
+
+  if (!league) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    league: league.name,
+    slug: league.slug,
+    status: league.status,
+    ready: league.status === "ACTIVE" || league.isFree,
+  });
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ token: string; path?: string[] }> }
@@ -34,13 +60,9 @@ export async function POST(
 
       for (const s of body.teamStandingInfoList) {
         const teamName = s.teamName || s.displayName || s.teamDisplayName || "Unknown";
-        const wins = (s.totalWins ?? s.wins ?? 0) + (s.awayWins ?? 0); // fallback
-        const losses = (s.totalLosses ?? s.losses ?? 0);
-        const ties = (s.totalTies ?? s.ties ?? 0);
 
-        // Try to find existing team by name
         let team = league.teams.find(
-          (t) => t.name === teamName || t.abbreviation === s.teamId
+          (t: any) => t.name === teamName || t.abbreviation === s.teamId
         );
 
         if (team) {
@@ -57,7 +79,6 @@ export async function POST(
             },
           });
         } else {
-          // Create new team
           await prisma.team.create({
             data: {
               leagueId: league.id,
@@ -97,7 +118,7 @@ export async function POST(
             age: p.age || null,
             development: p.devTrait ? String(p.devTrait) : null,
           },
-        }).catch(() => {}); // ignore duplicates for now
+        }).catch(() => {});
       }
     }
 
@@ -119,4 +140,15 @@ export async function POST(
     console.error("Import error:", err);
     return NextResponse.json({ error: "Import failed", detail: err.message }, { status: 500 });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+    },
+  });
 }
