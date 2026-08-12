@@ -38,7 +38,6 @@ export default async function LeaguePage({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/dashboard" className="font-bold text-xl tracking-tight">
@@ -58,7 +57,6 @@ export default async function LeaguePage({
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
-        {/* League Title */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold">{league.name}</h1>
@@ -78,7 +76,6 @@ export default async function LeaguePage({
           </p>
         </div>
 
-        {/* Activation / Export URL */}
         {!isActive && isOwner && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-8">
             <h2 className="font-semibold text-lg text-amber-300 mb-2">
@@ -106,7 +103,6 @@ export default async function LeaguePage({
           </div>
         )}
 
-        {/* Teams / Standings */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Teams & Standings</h2>
@@ -145,4 +141,26 @@ export default async function LeaguePage({
                         {team.isCpu && (
                           <span className="ml-2 text-xs text-zinc-500">CPU</span>
                         )}
-                      </
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
+                      </td>
+                      <td className="px-4 py-3">{team.overall ?? "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{team.division || "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">{team.conference || "—"}</td>
+                      <td className="px-4 py-3 text-zinc-400">
+                        {team.capAvailable
+                          ? `$${(team.capAvailable / 1000000).toFixed(1)}M`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
