@@ -3,9 +3,7 @@ import Stripe from "stripe";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2026-07-29.dahlia", // use latest stable when deploying
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -30,8 +28,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "League already active" }, { status: 400 });
   }
 
+  // If no Stripe keys are set, auto-activate (good for testing)
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_PRICE_ID) {
-    // Dev fallback: auto-activate without real Stripe
     await prisma.league.update({
       where: { id: leagueId },
       data: { status: "ACTIVE", paidAt: new Date() },
@@ -60,7 +58,6 @@ export async function POST(req: NextRequest) {
     customer_email: session.user.email || undefined,
   });
 
-  // Store session id for later verification
   await prisma.league.update({
     where: { id: leagueId },
     data: { stripeSessionId: checkoutSession.id },
