@@ -1,3 +1,7 @@
+console.log("Body keys:", Object.keys(body));
+if (body.gameScheduleInfoList) {
+  console.log("FOUND gameScheduleInfoList");
+}
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -148,7 +152,64 @@ export async function POST(
     return NextResponse.json({ error: "Import failed" }, { status: 500 });
   }
 }
+    // ========== SCHEDULES ==========
+    if (body.gameScheduleInfoList && Array.isArray(body.gameScheduleInfoList)) {
+      console.log("Parsing schedules...", body.gameScheduleInfoList.length, "games");
 
+      for (const g of body.gameScheduleInfoList) {
+        try {
+          const week = g.weekIndex ?? g.week ?? 0;
+          const homeName = g.homeTeamName || g.homeTeam || "Home";
+          const awayName = g.awayTeamName || g.awayTeam || "Away";
+
+          // Find teams by name
+          const homeTeam = await prisma.team.findFirst({
+            where: { leagueId: league.id, name: homeName },
+          });
+          const awayTeam = await prisma.team.findFirst({
+            where: { leagueId: league.id, name: awayName },
+          });
+
+          if (!homeTeam || !awayTeam) continue;
+
+          // Avoid duplicates
+          const existing = await prisma.game.findFirst({
+            where: {
+              leagueId: league.id,
+              week,
+              homeTeamId: homeTeam.id,
+              awayTeamId: awayTeam.id,
+            },
+          });
+
+          if (existing) {
+            await prisma.game.update({
+              where: { id: existing.id },
+              data: {
+                homeScore: g.homeScore ?? existing.homeScore,
+                awayScore: g.awayScore ?? existing.awayScore,
+                isComplete: g.status === "Complete" || g.isComplete || false,
+              },
+            });
+          } else {
+            await prisma.game.create({
+              data: {
+                leagueId: league.id,
+                week,
+                seasonType: g.seasonType || "Regular",
+                homeTeamId: homeTeam.id,
+                awayTeamId: awayTeam.id,
+                homeScore: g.homeScore ?? null,
+                awayScore: g.awayScore ?? null,
+                isComplete: g.status === "Complete" || false,
+              },
+            });
+          }
+        } catch (err: any) {
+          console.error("Schedule parse error:", err.message);
+        }
+      }
+    }
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
