@@ -20,8 +20,8 @@ export default async function LeaguePage({
         orderBy: [{ recordWins: "desc" }, { name: "asc" }],
       },
       players: {
-        orderBy: [{ overall: "desc" }, { lastName: "asc" }],
-        take: 100, // show top 100 for now
+        orderBy: [{ overall: "desc" }],
+        take: 8,
       },
       owner: { select: { name: true } },
       _count: {
@@ -42,98 +42,131 @@ export default async function LeaguePage({
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
-  <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-    <Link href="/dashboard" className="font-bold text-xl tracking-tight">
-      <span className="text-emerald-400">Madden</span> League HQ
-    </Link>
-    <div className="flex items-center gap-4 text-sm">
-      {session?.user?.role === "ADMIN" && (
-        <Link href="/admin" className="text-amber-400 hover:text-amber-300">
-          Admin
-        </Link>
-      )}
-      <Link href="/dashboard" className="text-zinc-400 hover:text-white">
-        Dashboard
-      </Link>
-      {session && (
-        <a
-          href="/api/auth/signout"
-          className="text-zinc-400 hover:text-red-400 transition"
-        >
-          Sign Out
-        </a>
-      )}
-    </div>
-  </div>
-</header>
+      {/* Top Navigation */}
+      <header className="border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+          <Link href="/dashboard" className="font-semibold tracking-tight">
+            <span className="text-emerald-400">Madden</span> League HQ
+          </Link>
+          <div className="flex items-center gap-5 text-sm">
+            {session?.user?.role === "ADMIN" && (
+              <Link href="/admin" className="text-amber-400 hover:text-amber-300 transition">
+                Admin
+              </Link>
+            )}
+            <Link href="/dashboard" className="text-zinc-400 hover:text-white transition">
+              Dashboard
+            </Link>
+            {session && (
+              <a href="/api/auth/signout" className="text-zinc-500 hover:text-red-400 transition">
+                Sign Out
+              </a>
+            )}
+          </div>
+        </div>
+      </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold">{league.name}</h1>
+        {/* League Header */}
+        <div className="mb-10">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{league.name}</h1>
             <span
               className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                 isActive
-                  ? "bg-emerald-500/15 text-emerald-400"
-                  : "bg-amber-500/15 text-amber-400"
+                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                  : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
               }`}
             >
               {league.isFree ? "FREE" : league.status.replace("_", " ")}
             </span>
           </div>
-          <p className="text-zinc-400">
-            {league._count.players} players · {league.teams.length} teams ·{" "}
-            {league._count.weeklyExports} exports received
+          <p className="text-zinc-400 text-sm">
+            {league._count.players.toLocaleString()} players · {league.teams.length} teams ·{" "}
+            {league._count.weeklyExports} exports
           </p>
         </div>
 
-        {/* Export URL */}
+        {/* Export URL Card */}
         {isActive && (
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-8">
-            <h2 className="font-semibold text-lg text-emerald-300 mb-2">
-              Export URL
-            </h2>
-            <code className="block bg-zinc-950 border border-zinc-700 rounded-lg px-4 py-3 text-sm break-all text-emerald-300 select-all">
+          <div className="bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-6 mb-10">
+            <h2 className="font-semibold text-emerald-300 mb-1">Export URL</h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Paste this into the Madden Companion App to sync your league.
+            </p>
+            <code className="block bg-zinc-950/80 border border-zinc-700/50 rounded-xl px-4 py-3 text-sm break-all text-emerald-300/90 select-all font-mono">
               {exportUrl}
             </code>
           </div>
         )}
 
-        {/* Teams */}
+        {!isActive && isOwner && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 mb-10">
+            <h2 className="font-semibold text-amber-300 mb-2">Activate League — $10</h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              One-time payment to unlock the export URL and full features.
+            </p>
+            <ActivateButton leagueId={league.id} />
+          </div>
+        )}
+
+        {/* Quick Links */}
+        <div className="flex flex-wrap gap-3 mb-10">
+          <Link
+            href={`/leagues/${slug}/players`}
+            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+          >
+            All Players →
+          </Link>
+        </div>
+
+        {/* Standings */}
         <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">
-            Teams & Standings ({league.teams.length})
-          </h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-semibold">Standings</h2>
+            <span className="text-sm text-zinc-500">{league.teams.length} teams</span>
+          </div>
 
           {league.teams.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500">
-              No teams yet. Export standings from the Companion App.
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500">
+              No teams imported yet
             </div>
           ) : (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-left text-zinc-400">
-                    <th className="px-4 py-3">Team</th>
-                    <th className="px-4 py-3">Record</th>
-                    <th className="px-4 py-3">OVR</th>
-                    <th className="px-4 py-3">Division</th>
-                    <th className="px-4 py-3">Conference</th>
+                  <tr className="border-b border-zinc-800 text-left text-zinc-500">
+                    <th className="px-5 py-3.5 font-medium">Team</th>
+                    <th className="px-5 py-3.5 font-medium">Record</th>
+                    <th className="px-5 py-3.5 font-medium">OVR</th>
+                    <th className="px-5 py-3.5 font-medium hidden sm:table-cell">Division</th>
+                    <th className="px-5 py-3.5 font-medium hidden md:table-cell">Conference</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {league.teams.map((team) => (
-                    <tr key={team.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-4 py-3 font-medium">
-  <Link href={`/leagues/${slug}/teams/${team.id}`} className="hover:text-emerald-400">
-    {team.name}
-  </Link>
-</td>
-                      <td className="px-4 py-3">{team.overall ?? "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{team.division || "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{team.conference || "—"}</td>
+                  {league.teams.map((team, i) => (
+                    <tr
+                      key={team.id}
+                      className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition"
+                    >
+                      <td className="px-5 py-3.5">
+                        <Link
+                          href={`/leagues/${slug}/teams/${team.id}`}
+                          className="font-medium hover:text-emerald-400 transition"
+                        >
+                          {team.name}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3.5 tabular-nums">
+                        {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
+                      </td>
+                      <td className="px-5 py-3.5 tabular-nums">{team.overall ?? "—"}</td>
+                      <td className="px-5 py-3.5 text-zinc-400 hidden sm:table-cell">
+                        {team.division || "—"}
+                      </td>
+                      <td className="px-5 py-3.5 text-zinc-400 hidden md:table-cell">
+                        {team.conference || "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -142,63 +175,46 @@ export default async function LeaguePage({
           )}
         </section>
 
-        {/* Players */}
-<section>
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-xl font-semibold">
-      Players (showing top 100 of {league._count.players})
-    </h2>
-    <Link
-      href={`/leagues/${slug}/players`}
-      className="text-sm text-emerald-400 hover:text-emerald-300"
-    >
-      View all players →
-    </Link>
-  </div>
+        {/* Top Players Preview */}
+        <section>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-xl font-semibold">Top Players</h2>
+            <Link
+              href={`/leagues/${slug}/players`}
+              className="text-sm text-emerald-400 hover:text-emerald-300 transition"
+            >
+              View all →
+            </Link>
+          </div>
 
           {league.players.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500">
-              No players yet. Export rosters from the Companion App.
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500">
+              No players imported yet
             </div>
           ) : (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-zinc-800 text-left text-zinc-400">
-                    <th className="px-4 py-3">Name</th>
-                    <th className="px-4 py-3">Pos</th>
-                    <th className="px-4 py-3">OVR</th>
-                    <th className="px-4 py-3">Age</th>
-                    <th className="px-4 py-3">SPD</th>
-                    <th className="px-4 py-3">STR</th>
-                    <th className="px-4 py-3">AGI</th>
-                    <th className="px-4 py-3">Dev</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {league.players.map((player) => (
-                    <tr key={player.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-4 py-3 font-medium">
-  <Link
-    href={`/leagues/${slug}/players/${player.id}`}
-    className="hover:text-emerald-400"
-  >
-    {player.firstName} {player.lastName}
-  </Link>
-</td>
-                      <td className="px-4 py-3">{player.position}</td>
-                      <td className="px-4 py-3 font-semibold text-emerald-400">
-                        {player.overall ?? "—"}
-                      </td>
-                      <td className="px-4 py-3 text-zinc-400">{player.age ?? "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{player.speed ?? "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{player.strength ?? "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{player.agility ?? "—"}</td>
-                      <td className="px-4 py-3 text-zinc-400">{player.development ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {league.players.map((player) => (
+                <Link
+                  key={player.id}
+                  href={`/leagues/${slug}/players/${player.id}`}
+                  className="bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 rounded-2xl p-5 transition group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="text-xs font-medium text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded">
+                      {player.position}
+                    </span>
+                    <span className="text-2xl font-bold text-emerald-400 group-hover:scale-105 transition">
+                      {player.overall ?? "—"}
+                    </span>
+                  </div>
+                  <div className="font-medium group-hover:text-emerald-300 transition">
+                    {player.firstName} {player.lastName}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    Age {player.age ?? "—"} · SPD {player.speed ?? "—"}
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </section>
