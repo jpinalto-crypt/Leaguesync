@@ -34,6 +34,13 @@ export default async function TeamPage({
     orderBy: [{ overall: "desc" }, { lastName: "asc" }],
   });
 
+  const gameCount = await prisma.game.count({
+    where: {
+      leagueId: league.id,
+      OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }],
+    },
+  });
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50">
@@ -41,12 +48,18 @@ export default async function TeamPage({
           <Link href={`/leagues/${slug}`} className="font-bold text-xl tracking-tight">
             <span className="text-emerald-400">←</span> {league.name}
           </Link>
+          <Link
+            href={`/leagues/${slug}/schedule`}
+            className="text-sm text-zinc-400 hover:text-white"
+          >
+            Full schedule
+          </Link>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-10">
         {/* Team Header */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 mb-8">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 mb-6">
           <h1 className="text-3xl font-bold mb-2">{team.name}</h1>
           <p className="text-zinc-400">
             Record:{" "}
@@ -54,7 +67,10 @@ export default async function TeamPage({
               {formatRecord(team.recordWins, team.recordLosses, team.recordTies)}
             </span>
             {" · "}
-            OVR: <span className="text-emerald-400 font-medium">{team.overall ?? "—"}</span>
+            OVR:{" "}
+            <span className="text-emerald-400 font-medium">
+              {team.overall ?? "—"}
+            </span>
             {team.division && (
               <>
                 {" · "}
@@ -63,8 +79,24 @@ export default async function TeamPage({
             )}
           </p>
           <p className="text-sm text-zinc-500 mt-2">
-            {players.length} players on roster
+            {players.length} players on roster · {gameCount} games
           </p>
+        </div>
+
+        {/* Quick links */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          <Link
+            href={`/leagues/${slug}/teams/${team.id}/schedule`}
+            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+          >
+            Team schedule →
+          </Link>
+          <Link
+            href={`/leagues/${slug}/players`}
+            className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm transition"
+          >
+            All players →
+          </Link>
         </div>
 
         {/* Roster */}
@@ -75,7 +107,7 @@ export default async function TeamPage({
             No players linked to this team yet.
             <br />
             <span className="text-sm">
-              Re-export rosters from the Companion App after the latest update.
+              Re-export rosters from the Companion App so players get linked by team ID.
             </span>
           </div>
         ) : (
@@ -111,10 +143,18 @@ export default async function TeamPage({
                     <td className="px-4 py-3 font-semibold text-emerald-400">
                       {player.overall ?? "—"}
                     </td>
-                    <td className="px-4 py-3 text-zinc-400">{player.age ?? "—"}</td>
-                    <td className="px-4 py-3 text-zinc-400">{player.speed ?? "—"}</td>
-                    <td className="px-4 py-3 text-zinc-400">{player.strength ?? "—"}</td>
-                    <td className="px-4 py-3 text-zinc-400">{player.agility ?? "—"}</td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      {player.age ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      {player.speed ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      {player.strength ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-400">
+                      {player.agility ?? "—"}
+                    </td>
                     <td className="px-4 py-3 text-zinc-400">
                       {player.development ?? "—"}
                     </td>
