@@ -43,7 +43,10 @@ export async function POST(req: NextRequest) {
       if (!leagueSlug) {
         return NextResponse.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "Please provide a league slug. Example: `/standings league:tyest-league`" },
+          data: {
+            content:
+              "Please provide a league slug. Example: `/standings league:tyest-league`",
+          },
         });
       }
 
@@ -93,7 +96,9 @@ export async function POST(req: NextRequest) {
       if (!name || !leagueSlug) {
         return NextResponse.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "Usage: `/player name:Mahomes league:tyest-league`" },
+          data: {
+            content: "Usage: `/player name:Mahomes league:tyest-league`",
+          },
         });
       }
 
@@ -136,11 +141,31 @@ export async function POST(req: NextRequest) {
               color: 0x10b981,
               fields: [
                 { name: "Age", value: String(player.age ?? "—"), inline: true },
-                { name: "Speed", value: String(player.speed ?? "—"), inline: true },
-                { name: "Strength", value: String(player.strength ?? "—"), inline: true },
-                { name: "Agility", value: String(player.agility ?? "—"), inline: true },
-                { name: "Acceleration", value: String(player.acceleration ?? "—"), inline: true },
-                { name: "Awareness", value: String(player.awareness ?? "—"), inline: true },
+                {
+                  name: "Speed",
+                  value: String(player.speed ?? "—"),
+                  inline: true,
+                },
+                {
+                  name: "Strength",
+                  value: String(player.strength ?? "—"),
+                  inline: true,
+                },
+                {
+                  name: "Agility",
+                  value: String(player.agility ?? "—"),
+                  inline: true,
+                },
+                {
+                  name: "Acceleration",
+                  value: String(player.acceleration ?? "—"),
+                  inline: true,
+                },
+                {
+                  name: "Awareness",
+                  value: String(player.awareness ?? "—"),
+                  inline: true,
+                },
               ],
             },
           ],
@@ -156,7 +181,9 @@ export async function POST(req: NextRequest) {
       if (!teamName || !leagueSlug) {
         return NextResponse.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "Usage: `/team name:Chiefs league:tyest-league`" },
+          data: {
+            content: "Usage: `/team name:Chiefs league:tyest-league`",
+          },
         });
       }
 
@@ -186,13 +213,14 @@ export async function POST(req: NextRequest) {
       }
 
       const topPlayers = await prisma.player.findMany({
-        where: { leagueId: league.id },
+        where: { leagueId: league.id, teamId: team.id },
         orderBy: { overall: "desc" },
         take: 5,
       });
 
       const playerLines = topPlayers.map(
-        (p) => `• ${p.firstName} ${p.lastName} (${p.position}) — ${p.overall ?? "—"} OVR`
+        (p) =>
+          `• ${p.firstName} ${p.lastName} (${p.position}) — ${p.overall ?? "—"} OVR`
       );
 
       return NextResponse.json({
@@ -203,12 +231,14 @@ export async function POST(req: NextRequest) {
               title: team.name,
               description: `Record: **${team.recordWins}-${team.recordLosses}${
                 team.recordTies ? `-${team.recordTies}` : ""
-              }** · OVR **${team.overall ?? "—"}**\n${team.division || ""} ${team.conference || ""}`,
+              }** · OVR **${team.overall ?? "—"}**\n${team.division || ""} ${
+                team.conference || ""
+              }`,
               color: 0x10b981,
               fields: [
                 {
-                  name: "Top Players (league)",
-                  value: playerLines.join("\n") || "No players",
+                  name: "Top Players",
+                  value: playerLines.join("\n") || "No linked players yet",
                 },
               ],
             },
@@ -225,7 +255,9 @@ export async function POST(req: NextRequest) {
       if (!leagueSlug) {
         return NextResponse.json({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: "Usage: `/top league:tyest-league position:WR`" },
+          data: {
+            content: "Usage: `/top league:tyest-league position:WR`",
+          },
         });
       }
 
@@ -251,7 +283,9 @@ export async function POST(req: NextRequest) {
 
       const lines = players.map(
         (p, i) =>
-          `**${i + 1}.** ${p.firstName} ${p.lastName} (${p.position}) — **${p.overall ?? "—"}** OVR`
+          `**${i + 1}.** ${p.firstName} ${p.lastName} (${p.position}) — **${
+            p.overall ?? "—"
+          }** OVR`
       );
 
       return NextResponse.json({
@@ -264,6 +298,113 @@ export async function POST(req: NextRequest) {
                 : `Top Players — ${league.name}`,
               description: lines.join("\n") || "No players found.",
               color: 0x10b981,
+            },
+          ],
+        },
+      });
+    }
+
+    // ========== /myteam ==========
+    if (commandName === "myteam") {
+      const leagueSlug = options.find((o: any) => o.name === "league")?.value;
+      const discordUserId =
+        interaction.member?.user?.id || interaction.user?.id;
+
+      if (!discordUserId) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: "Could not identify your Discord account." },
+        });
+      }
+
+      const user = await prisma.user.findFirst({
+        where: { discordId: String(discordUserId) },
+      });
+
+      if (!user) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content:
+              "No account linked. Sign in on the website with Discord first, join a league, and claim a team.",
+          },
+        });
+      }
+
+      const memberships = await prisma.leagueMember.findMany({
+        where: {
+          userId: user.id,
+          teamId: { not: null },
+          ...(leagueSlug ? { league: { slug: leagueSlug } } : {}),
+        },
+        include: {
+          team: true,
+          league: { select: { name: true, slug: true } },
+        },
+      });
+
+      if (memberships.length === 0) {
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: leagueSlug
+              ? `You haven't claimed a team in \`${leagueSlug}\` yet.`
+              : "You haven't claimed a team in any league yet. Join a league on the site and claim your team.",
+          },
+        });
+      }
+
+      if (!leagueSlug && memberships.length > 1) {
+        const lines = memberships.map(
+          (m) =>
+            `• **${m.team?.name}** in \`${m.league.slug}\` (${m.league.name})`
+        );
+        return NextResponse.json({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            embeds: [
+              {
+                title: "Your teams",
+                description:
+                  lines.join("\n") +
+                  "\n\nUse `/myteam league:slug` for details.",
+                color: 0x10b981,
+              },
+            ],
+          },
+        });
+      }
+
+      const m = memberships[0];
+      const team = m.team!;
+
+      return NextResponse.json({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          embeds: [
+            {
+              title: team.name,
+              description: `**${m.league.name}** (\`${m.league.slug}\`)`,
+              color: 0x10b981,
+              fields: [
+                {
+                  name: "Record",
+                  value: `${team.recordWins}-${team.recordLosses}${
+                    team.recordTies ? `-${team.recordTies}` : ""
+                  }`,
+                  inline: true,
+                },
+                {
+                  name: "OVR",
+                  value: String(team.overall ?? "—"),
+                  inline: true,
+                },
+                {
+                  name: "Division",
+                  value: team.division || "—",
+                  inline: true,
+                },
+              ],
             },
           ],
         },
