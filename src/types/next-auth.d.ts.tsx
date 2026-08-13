@@ -13,10 +13,3 @@ declare module "next-auth" {
     discordId?: string | null;
   }
 }
-
-declare module "next-auth/adapters" {
-  interface AdapterUser {
-    role?: "USER" | "ADMIN";
-    discordId?: string | null;
-  }
-}
