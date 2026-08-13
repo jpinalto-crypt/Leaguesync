@@ -40,7 +40,7 @@ export default async function LeaguePage({
   const isOwner = session?.user?.id === league.ownerId;
   const isAdmin = session?.user?.role === "ADMIN";
   const isActive = league.status === "ACTIVE" || league.isFree;
-  const exportUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/import/${league.exportToken}`;
+  const exportUrl = `${process.env.IMPORT_RELAY_URL || process.env.NEXT_PUBLIC_APP_URL + "/api/import"}/${league.exportToken}`;
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/join/${league.inviteCode || league.slug}`;
 
   let membership = null;
