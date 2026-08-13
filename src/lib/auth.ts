@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Discord from "next-auth/providers/discord";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import type { Role } from "@prisma/client";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   adapter: PrismaAdapter(prisma),
@@ -10,37 +10,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Discord({
       clientId: process.env.DISCORD_CLIENT_ID!,
       clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-      authorization: { params: { scope: "identify email" } },
-    }),
-  ],
-  // ... rest of your callbacks / session config
-});
-
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id: string;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-      role: Role;
-      discordId?: string | null;
-    };
-  }
-
-  interface User {
-    role: Role;
-    discordId?: string | null;
-  }
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    Discord({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
-      authorization: { params: { scope: "identify email" } },
+      authorization: {
+        params: { scope: "identify email" },
+      },
     }),
   ],
   callbacks: {
@@ -48,7 +20,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = user.id;
         session.user.role = (user as any).role ?? "USER";
-        session.user.discordId = (user as any).discordId ?? null;
       }
       return session;
     },
@@ -59,7 +30,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .split(",")
           .map((id) => id.trim())
           .filter(Boolean);
-
         const isAdmin = adminIds.includes(discordId);
 
         try {
@@ -70,9 +40,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               role: isAdmin ? "ADMIN" : "USER",
             },
           });
-        } catch (error) {
-          // User might not be fully created yet — ignore
-          console.log("Could not update user role on first login");
+        } catch {
+          // user row may not be ready yet on first insert; ignore
         }
       }
       return true;
@@ -81,5 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: "/login",
   },
-  session: { strategy: "database" },
+  session: {
+    strategy: "database",
+  },
 });
