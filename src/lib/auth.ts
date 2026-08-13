@@ -18,13 +18,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async session({ session, user }) {
       if (session.user) {
-        session.user.id = user.id;
-        session.user.role = (user as any).role ?? "USER";
+        (session.user as any).id = user.id;
+        (session.user as any).role = (user as any).role ?? "USER";
       }
       return session;
     },
     async signIn({ user, account, profile }) {
-      if (account?.provider === "discord" && profile) {
+      if (account?.provider === "discord" && profile && user?.id) {
         const discordId = String((profile as any).id);
         const adminIds = (process.env.ADMIN_DISCORD_IDS || "")
           .split(",")
@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
           });
         } catch {
-          // user row may not be ready yet on first insert; ignore
+          // ignore if user row not ready yet
         }
       }
       return true;
